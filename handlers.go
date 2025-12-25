@@ -56,6 +56,24 @@ func AddTodo(db *sql.DB, title string) (int64, error) {
 	return id, nil
 }
 
+func DeleteTodo(db *sql.DB, id int64) error {
+	result, err := db.Exec("DELETE FROM todos WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("delete todo : %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
 func UpdateTodo(db *sql.DB, title string, id int64) (Todo, error) {
 	result, err := db.Exec("UPDATE todos SET title = ? WHERE id = ?", title, id)
 	if err != nil {

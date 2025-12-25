@@ -81,6 +81,27 @@ func main() {
 		w.WriteHeader(http.StatusCreated)
 	})
 
+	r.HandleFunc("DELETE /todos/{id}", func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+
+		err = DeleteTodo(db, id)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				http.Error(w, "todo not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, "failed to delete todo", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	r.HandleFunc("PUT /todos/{id}", func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.PathValue("id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
