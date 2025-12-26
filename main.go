@@ -12,7 +12,11 @@ import (
 )
 
 type Todo struct {
-	ID    string `json:"id"`
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+}
+
+type CreateTodoRequest struct {
 	Title string `json:"title"`
 }
 
@@ -44,7 +48,12 @@ func main() {
 	})
 
 	r.HandleFunc("GET /todos/{id}", func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
+		idStr := r.PathValue("id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
 
 		// With a lock:
 		// one person writes
@@ -63,22 +72,30 @@ func main() {
 	})
 
 	r.HandleFunc("POST /todos", func(w http.ResponseWriter, r *http.Request) {
-		var todo Todo
+		var req CreateTodoRequest
 
-		if err := json.NewDecoder(r.Body).Decode(&todo); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "invalid json", http.StatusBadRequest)
+			return
+		}
+
+		if err := req.Validate(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		mu.Lock()
 		defer mu.Unlock()
-		_, err = AddTodo(db, todo.Title)
+		id, err := AddTodo(db, req.Title)
 		if err != nil {
 			http.Error(w, "failed to create todo", http.StatusInternalServerError)
 			return
 		}
 
+		todo := Todo{ID: id, Title: req.Title}
+
 		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(todo)
 	})
 
 	r.HandleFunc("DELETE /todos/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +120,7 @@ func main() {
 	})
 
 	r.HandleFunc("PUT /todos/{id}", func(w http.ResponseWriter, r *http.Request) {
+		var req CreateTodoRequest
 		idStr := r.PathValue("id")
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
@@ -110,21 +128,18 @@ func main() {
 			return
 		}
 
-		var input struct {
-			Title string `json:"title"`
-		}
-
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "invalid json", http.StatusBadRequest)
 			return
 		}
 
-		if input.Title == "" {
-			http.Error(w, "Title is required", http.StatusBadRequest)
+		// validation
+		if err := req.Validate(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		todo, err := UpdateTodo(db, input.Title, id)
+		todo, err := UpdateTodo(db, req.Title, id)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				http.Error(w, "todo not found", http.StatusNotFound)

@@ -29,7 +29,7 @@ func GetTodos(db *sql.DB) ([]Todo, error) {
 	return todos, nil
 }
 
-func GetTodo(db *sql.DB, id string) (Todo, error) {
+func GetTodo(db *sql.DB, id int64) (Todo, error) {
 	var todo Todo
 
 	if err := db.QueryRow("SELECT id, title FROM todos WHERE id = ?", id).Scan(&todo.ID, &todo.Title); err != nil {
